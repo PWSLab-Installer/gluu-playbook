@@ -1,0 +1,92 @@
+- hosts: localhost
+  connection: local
+
+  vars:
+    
+
+  tasks:
+      
+    -   name: Check the version of OS
+        command: hostnamectl
+        register: os_check
+        ignore_errors: yes 
+
+
+    -   name: Add Gluu Repo - Ubuntu 20.04
+        lineinfile:
+            path: /etc/apt/sources.list.d/gluu-repo.list
+            line: deb https://repo.gluu.org/ubuntu/ focal main
+            create: yes
+        when: 
+            - os_check.stdout | regex_search("Ubuntu 20")
+
+    -   name: Add Gluu Repo - Ubuntu 18.04
+        lineinfile:
+            path: /etc/apt/sources.list.d/gluu-repo.list
+            line: deb https://repo.gluu.org/ubuntu/ bionic main
+            create: yes
+        when: 
+            - os_check.stdout | regex_search("Ubuntu 18")
+            
+
+    -   name: Add Gluu Repo - CentOS 8
+        get_url:
+            url: https://repo.gluu.org/centos/Gluu-centos8.repo
+            dest: /etc/yum.repos.d/Gluu.repo
+        when:
+            - os_check.stdout | regex_search("CentOS Linux 8")
+
+    -   name: Add Gluu Repo - CentOS 7
+        get_url:
+            url: https://repo.gluu.org/centos/Gluu-centos7.repo
+            dest: /etc/yum.repos.d/Gluu.repo
+        when:
+            - os_check.stdout | regex_search("CentOS Linux 7")
+
+    -   name: Add Gluu Repo Key - CentOS 
+        get_url:
+            url: https://repo.gluu.org/centos/RPM-GPG-KEY-GLUU
+            dest: /etc/pki/rpm-gpg/RPM-GPG-KEY-GLUU
+        when:
+            - os_check.stdout | regex_search("CentOS")
+
+    -   name: Add an apt key - Ubuntu
+        shell: curl https://repo.gluu.org/ubuntu/gluu-apt.key | apt-key add -
+        when:
+            - os_check.stdout | regex_search("Ubuntu")
+
+
+    -   name: Add RPM Key - CentOS
+        shell: rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-GLUU
+        when:
+            - os_check.stdout | regex_search("CentOS")
+
+    -   name: Clean Temp Yum - CentOS
+        shell: yum clean all
+        when:
+            - os_check.stdout | regex_search("CentOS")
+
+    -   name: Install gluu-server - Ubuntu
+        apt: name=gluu-server update_cache=yes state=present
+        when:
+            - os_check.stdout | regex_search("Ubuntu")
+
+    -   name: Install gluu-server - CentOS
+        yum: name=gluu-server state=present
+        when:
+            - os_check.stdout | regex_search("CentOS")
+
+    -   name: Enable Gluu
+        shell: /sbin/gluu-serverd enable
+
+    -   name: Initiate Gluu
+        shell: /sbin/gluu-serverd start
+
+    -   name: Post Installation Steps
+        debug: 
+            msg:
+              - 'Things left to do:'
+              - '- Configuration is completed by running the setup script from inside the chroot container. This generates certificates, salt values, and renders configuration files. Run the script with the following commands:'
+              - '   - service gluu-server login'
+              - '   - cd /install/community-edition-setup'
+              - '   - ./setup.py'
